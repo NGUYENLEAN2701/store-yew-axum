@@ -2,7 +2,8 @@ use shared::{Category, Product};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::api;
+use crate::api::{self, ApiClientError};
+use crate::captcha_gate::use_captcha_gate;
 use crate::components::ProductCard;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -16,20 +17,37 @@ pub fn home() -> Html {
     let products = use_state(|| None::<Vec<Product>>);
     let error = use_state(|| None::<String>);
     let filter = use_state(|| Filter::All);
+    let retry = use_state(|| 0u32);
+    let captcha_gate = use_captcha_gate();
 
     {
         let products = products.clone();
         let error = error.clone();
-        use_effect_with((), move |_| {
+        let captcha_gate = captcha_gate.clone();
+        use_effect_with(*retry, move |_| {
             spawn_local(async move {
                 match api::get_json::<Vec<Product>>("/api/products").await {
-                    Ok(list) => products.set(Some(list)),
+                    Ok(list) => {
+                        products.set(Some(list));
+                        error.set(None);
+                    }
+                    Err(ApiClientError::CaptchaRequired) => {
+                        captcha_gate.open();
+                        error.set(Some(
+                            "Cần xác minh captcha. Giải captcha xong rồi bấm Thử lại.".to_string(),
+                        ));
+                    }
                     Err(e) => error.set(Some(e.to_string())),
                 }
             });
             || ()
         });
     }
+
+    let on_retry = {
+        let retry = retry.clone();
+        Callback::from(move |_: MouseEvent| retry.set(*retry + 1))
+    };
 
     let make_filter_cb = |f: Filter| {
         let filter = filter.clone();
@@ -77,7 +95,12 @@ pub fn home() -> Html {
 
             {
                 if let Some(err) = error.as_ref() {
-                    html! { <p class="error-text">{ err }</p> }
+                    html! {
+                        <div class="empty-state">
+                            <p class="error-text">{ err }</p>
+                            <button type="button" class="btn-secondary" onclick={on_retry}>{ "Thử lại" }</button>
+                        </div>
+                    }
                 } else if products.is_none() {
                     html! { <p class="loading-text">{ "Đang tải sản phẩm..." }</p> }
                 } else if filtered.is_empty() {

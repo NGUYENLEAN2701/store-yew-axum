@@ -4,8 +4,9 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use crate::api;
+use crate::api::{self, ApiClientError};
 use crate::app::Route;
+use crate::captcha_gate::use_captcha_gate;
 use crate::cart::{use_cart, CartAction};
 use crate::format::format_vnd;
 
@@ -20,25 +21,42 @@ pub fn product_detail(props: &ProductDetailProps) -> Html {
     let error = use_state(|| None::<String>);
     let quantity = use_state(|| 1i64);
     let added = use_state(|| false);
+    let retry = use_state(|| 0u32);
     let cart = use_cart();
     let navigator = use_navigator();
+    let captcha_gate = use_captcha_gate();
 
     {
         let product = product.clone();
         let error = error.clone();
         let id = props.id.clone();
-        use_effect_with(id.clone(), move |id| {
+        let captcha_gate = captcha_gate.clone();
+        use_effect_with((id.clone(), *retry), move |(id, _)| {
             let id = id.clone();
             product.set(None);
             spawn_local(async move {
                 match api::get_json::<Product>(&format!("/api/products/{id}")).await {
-                    Ok(p) => product.set(Some(p)),
+                    Ok(p) => {
+                        product.set(Some(p));
+                        error.set(None);
+                    }
+                    Err(ApiClientError::CaptchaRequired) => {
+                        captcha_gate.open();
+                        error.set(Some(
+                            "Cần xác minh captcha. Giải captcha xong rồi bấm Thử lại.".to_string(),
+                        ));
+                    }
                     Err(e) => error.set(Some(e.to_string())),
                 }
             });
             || ()
         });
     }
+
+    let on_retry = {
+        let retry = retry.clone();
+        Callback::from(move |_: MouseEvent| retry.set(*retry + 1))
+    };
 
     let on_quantity_input = {
         let quantity = quantity.clone();
@@ -79,7 +97,12 @@ pub fn product_detail(props: &ProductDetailProps) -> Html {
     };
 
     if let Some(err) = error.as_ref() {
-        return html! { <p class="error-text">{ err }</p> };
+        return html! {
+            <div class="empty-state">
+                <p class="error-text">{ err }</p>
+                <button type="button" class="btn-secondary" onclick={on_retry}>{ "Thử lại" }</button>
+            </div>
+        };
     }
 
     let Some(p) = product.as_ref() else {

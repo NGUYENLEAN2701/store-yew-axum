@@ -56,12 +56,21 @@ pub fn admin_products() -> Html {
     let reload = {
         let products = products.clone();
         let error = error.clone();
+        let captcha_gate = captcha_gate.clone();
         Callback::from(move |_: ()| {
             let products = products.clone();
             let error = error.clone();
+            let captcha_gate = captcha_gate.clone();
             spawn_local(async move {
                 match api::get_json::<Vec<Product>>("/api/products").await {
-                    Ok(list) => products.set(Some(list)),
+                    Ok(list) => {
+                        products.set(Some(list));
+                        error.set(None);
+                    }
+                    Err(ApiClientError::CaptchaRequired) => {
+                        captcha_gate.open();
+                        error.set(Some("Cần xác minh captcha để tải danh sách.".to_string()));
+                    }
                     Err(e) => error.set(Some(e.to_string())),
                 }
             });
@@ -204,14 +213,17 @@ pub fn admin_products() -> Html {
         let error = error.clone();
         let status = status.clone();
         let reload = reload.clone();
+        let captcha_gate = captcha_gate.clone();
         move |id: String| {
             let error = error.clone();
             let status = status.clone();
             let reload = reload.clone();
+            let captcha_gate = captcha_gate.clone();
             Callback::from(move |_: MouseEvent| {
                 let error = error.clone();
                 let status = status.clone();
                 let reload = reload.clone();
+                let captcha_gate = captcha_gate.clone();
                 let id = id.clone();
                 spawn_local(async move {
                     match api::delete_empty(&format!("/api/admin/products/{id}")).await {
@@ -219,6 +231,7 @@ pub fn admin_products() -> Html {
                             status.set(Some("Đã xóa sản phẩm.".to_string()));
                             reload.emit(());
                         }
+                        Err(ApiClientError::CaptchaRequired) => captcha_gate.open(),
                         Err(e) => error.set(Some(e.to_string())),
                     }
                 });

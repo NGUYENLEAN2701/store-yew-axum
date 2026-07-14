@@ -28,17 +28,37 @@ pub fn admin_gate() -> Html {
 
     {
         let mode = mode.clone();
+        let error = error.clone();
+        let captcha_gate = captcha_gate.clone();
         let navigator = navigator.clone();
         use_effect_with((), move |_| {
             spawn_local(async move {
-                if api::get_json::<AdminMe>("/api/admin/me").await.is_ok() {
-                    if let Some(nav) = navigator {
-                        nav.push(&Route::AdminProducts);
+                match api::get_json::<AdminMe>("/api/admin/me").await {
+                    Ok(_) => {
+                        if let Some(nav) = navigator {
+                            nav.push(&Route::AdminProducts);
+                        }
+                        return;
                     }
-                    return;
+                    Err(ApiClientError::CaptchaRequired) => {
+                        captcha_gate.open();
+                        error.set(Some(
+                            "Cần xác minh captcha. Giải xong rồi tải lại trang.".to_string(),
+                        ));
+                        mode.set(Mode::Login);
+                        return;
+                    }
+                    Err(_) => {}
                 }
                 match api::get_json::<SetupStatus>("/api/setup/status").await {
                     Ok(status) if status.needs_setup => mode.set(Mode::Setup),
+                    Err(ApiClientError::CaptchaRequired) => {
+                        captcha_gate.open();
+                        error.set(Some(
+                            "Cần xác minh captcha. Giải xong rồi tải lại trang.".to_string(),
+                        ));
+                        mode.set(Mode::Login);
+                    }
                     _ => mode.set(Mode::Login),
                 }
             });

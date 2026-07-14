@@ -4,8 +4,9 @@ use web_sys::HtmlSelectElement;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use crate::api;
+use crate::api::{self, ApiClientError};
 use crate::app::Route;
+use crate::captcha_gate::use_captcha_gate;
 use crate::format::{format_timestamp, format_vnd};
 use crate::pages::admin_shell::AdminShell;
 
@@ -34,16 +35,26 @@ pub fn admin_orders() -> Html {
     let navigator = use_navigator();
     let orders = use_state(|| None::<Vec<Order>>);
     let error = use_state(|| None::<String>);
+    let captcha_gate = use_captcha_gate();
 
     let reload = {
         let orders = orders.clone();
         let error = error.clone();
+        let captcha_gate = captcha_gate.clone();
         Callback::from(move |_: ()| {
             let orders = orders.clone();
             let error = error.clone();
+            let captcha_gate = captcha_gate.clone();
             spawn_local(async move {
                 match api::get_json::<Vec<Order>>("/api/admin/orders").await {
-                    Ok(list) => orders.set(Some(list)),
+                    Ok(list) => {
+                        orders.set(Some(list));
+                        error.set(None);
+                    }
+                    Err(ApiClientError::CaptchaRequired) => {
+                        captcha_gate.open();
+                        error.set(Some("Cần xác minh captcha để tải danh sách.".to_string()));
+                    }
                     Err(e) => error.set(Some(e.to_string())),
                 }
             });
@@ -70,14 +81,17 @@ pub fn admin_orders() -> Html {
     let make_status_change_cb = {
         let error = error.clone();
         let reload = reload.clone();
+        let captcha_gate = captcha_gate.clone();
         move |order_id: String| {
             let error = error.clone();
             let reload = reload.clone();
+            let captcha_gate = captcha_gate.clone();
             Callback::from(move |e: Event| {
                 let select: HtmlSelectElement = e.target_unchecked_into();
                 let status = status_from_value(&select.value());
                 let error = error.clone();
                 let reload = reload.clone();
+                let captcha_gate = captcha_gate.clone();
                 let order_id = order_id.clone();
                 spawn_local(async move {
                     let input = UpdateOrderStatusInput { status };
@@ -88,6 +102,7 @@ pub fn admin_orders() -> Html {
                     .await;
                     match result {
                         Ok(_) => reload.emit(()),
+                        Err(ApiClientError::CaptchaRequired) => captcha_gate.open(),
                         Err(e) => error.set(Some(e.to_string())),
                     }
                 });
