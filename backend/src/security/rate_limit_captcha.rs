@@ -146,7 +146,9 @@ pub async fn rate_limit_captcha(
     request: Request,
     next: Next,
 ) -> Response {
-    if request.uri().path().starts_with("/api/captcha/") {
+    // NOTE: this middleware is layered on the router that gets nested under "/api",
+    // so by the time it runs, axum has already stripped that prefix from the URI.
+    if request.uri().path().starts_with("/captcha/") {
         return next.run(request).await;
     }
 
