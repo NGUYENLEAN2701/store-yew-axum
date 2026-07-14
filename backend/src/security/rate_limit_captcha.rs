@@ -24,18 +24,10 @@ const VERIFIED_TTL: Duration = Duration::from_secs(5 * 60);
 const CHALLENGE_TTL: Duration = Duration::from_secs(2 * 60);
 const IDLE_ENTRY_TTL: Duration = Duration::from_secs(10 * 60);
 
+#[derive(Default)]
 struct IpState {
     hits: VecDeque<Instant>,
     verified_until: Option<Instant>,
-}
-
-impl Default for IpState {
-    fn default() -> Self {
-        Self {
-            hits: VecDeque::new(),
-            verified_until: None,
-        }
-    }
 }
 
 /// Tracks recent request bursts per client IP and gates them behind a simple

@@ -43,9 +43,8 @@ impl Reducible for CartState {
     type Action = CartAction;
 
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
-        match action {
-            CartAction::Load(state) => return Rc::new(state),
-            _ => {}
+        if let CartAction::Load(state) = action {
+            return Rc::new(state);
         }
 
         let mut lines = self.lines.clone();

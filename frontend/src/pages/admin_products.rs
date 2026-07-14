@@ -295,7 +295,7 @@ pub fn admin_products() -> Html {
                                 </tr>
                             </thead>
                             <tbody>
-                                { for list.iter().cloned().map(|p| {
+                                { for list.iter().map(|p| {
                                     let edit_cb = make_edit_cb(p.clone());
                                     let delete_cb = make_delete_cb(p.id.clone());
                                     html! {
