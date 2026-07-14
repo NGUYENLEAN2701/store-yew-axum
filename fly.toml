@@ -1,6 +1,6 @@
 # Fly.io app configuration for GreenIEM (Yew frontend + Axum backend, single container).
 # Update `app` to the name you registered with `fly apps create <name>` before deploying.
-app = "greeniem-store"
+app = "greeniemstore"
 primary_region = "sin"
 
 [build]

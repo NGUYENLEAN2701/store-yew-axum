@@ -12,7 +12,7 @@ pub async fn security_headers(request: Request, next: Next) -> Response {
     headers.insert(
         "Content-Security-Policy",
         HeaderValue::from_static(
-            "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'",
+            "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; connect-src 'self'",
         ),
     );
     response
